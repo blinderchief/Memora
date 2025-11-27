@@ -138,22 +138,59 @@ class EmbeddingService:
 
     async def _embed_batch_with_gemini(self, texts: List[str]) -> List[List[float]]:
         """Embed batch of texts using Gemini API."""
+        import asyncio
+
         try:
             results = []
-            # Gemini has batch limits, process in chunks
-            batch_size = 100
+            # Gemini API supports batching - send multiple texts at once
+            batch_size = 100  # Gemini batch limit
+
             for i in range(0, len(texts), batch_size):
                 batch = texts[i:i + batch_size]
-                for text in batch:
-                    result = self.gemini_client.models.embed_content(
+
+                # Use batch_embed_contents for true batching
+                try:
+                    # Try batch embedding first (more efficient)
+                    batch_results = self.gemini_client.models.batch_embed_contents(
                         model="models/text-embedding-004",
-                        contents=text,
-                        config=types.EmbedContentConfig(
-                            task_type="RETRIEVAL_DOCUMENT",
-                            output_dimensionality=settings.embedding_dimension,
-                        ),
+                        requests=[
+                            types.EmbedContentRequest(
+                                content=text,
+                                task_type="RETRIEVAL_DOCUMENT",
+                                output_dimensionality=settings.embedding_dimension,
+                            )
+                            for text in batch
+                        ],
                     )
-                    results.append(list(result.embeddings[0].values))
+                    for emb in batch_results.embeddings:
+                        results.append(list(emb.values))
+                except Exception as batch_error:
+                    # Fallback to concurrent individual requests
+                    logger.warning(
+                        f"Batch embed failed, using concurrent requests: {batch_error}")
+
+                    async def embed_single(text: str) -> List[float]:
+                        result = self.gemini_client.models.embed_content(
+                            model="models/text-embedding-004",
+                            contents=text,
+                            config=types.EmbedContentConfig(
+                                task_type="RETRIEVAL_DOCUMENT",
+                                output_dimensionality=settings.embedding_dimension,
+                            ),
+                        )
+                        return list(result.embeddings[0].values)
+
+                    # Run concurrently with semaphore to avoid rate limits
+                    # Max 10 concurrent requests
+                    semaphore = asyncio.Semaphore(10)
+
+                    async def embed_with_limit(text: str) -> List[float]:
+                        async with semaphore:
+                            return await embed_single(text)
+
+                    batch_embeddings = await asyncio.gather(*[embed_with_limit(t) for t in batch])
+                    results.extend(batch_embeddings)
+
             return results
         except Exception as e:
             logger.error(f"Gemini batch embedding failed: {e}")
@@ -237,21 +274,28 @@ class EmbeddingService:
         tf = Counter(tokens)
         doc_length = len(tokens)
         
-        # Calculate BM25-style weights
-        indices = []
-        values = []
+        # Calculate BM25-style weights - use dict to handle hash collisions
+        index_values: Dict[int, float] = {}
         
         for term, freq in tf.items():
             # Simple hash to index (in practice, use vocabulary)
-            term_idx = hash(term) % 30000  # Sparse vector dimension
+            term_idx = abs(hash(term) % 30000)  # Sparse vector dimension
             
             # BM25 term frequency component
             tf_component = (freq * (self._k1 + 1)) / (
                 freq + self._k1 * (1 - self._b + self._b * doc_length / self._avg_doc_length)
             )
             
-            indices.append(abs(term_idx))
-            values.append(float(tf_component))
+            # Aggregate values for same index (handle hash collisions)
+            if term_idx in index_values:
+                index_values[term_idx] += float(tf_component)
+            else:
+                index_values[term_idx] = float(tf_component)
+
+        # Convert to sorted lists (Qdrant prefers sorted indices)
+        sorted_items = sorted(index_values.items())
+        indices = [idx for idx, _ in sorted_items]
+        values = [val for _, val in sorted_items]
         
         return {"indices": indices, "values": values}
 

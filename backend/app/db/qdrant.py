@@ -150,6 +150,56 @@ class QdrantService:
             logger.error(f"Failed to upsert memory {memory_id}: {e}")
             raise
 
+    async def upsert_memories_batch(
+        self,
+        memories: List[Dict[str, Any]],
+    ) -> int:
+        """
+        Batch upsert multiple memories at once for better performance.
+        
+        Args:
+            memories: List of dicts with memory_id, dense_vector, sparse_vector, payload
+            
+        Returns:
+            Number of memories successfully upserted
+        """
+        if not memories:
+            return 0
+
+        try:
+            points = []
+            for mem in memories:
+                vectors = {"dense": mem["dense_vector"]}
+
+                # Add sparse vector if provided
+                if mem.get("sparse_vector"):
+                    sparse = mem["sparse_vector"]
+                    if sparse.get("indices") and sparse.get("values"):
+                        vectors["sparse"] = qmodels.SparseVector(
+                            indices=sparse["indices"],
+                            values=sparse["values"],
+                        )
+
+                points.append(
+                    qmodels.PointStruct(
+                        id=str(mem["memory_id"]),
+                        vector=vectors,
+                        payload=mem["payload"],
+                    )
+                )
+
+            # Batch upsert all points at once
+            self.client.upsert(
+                collection_name=self._collection_name,
+                points=points,
+                wait=True,
+            )
+            return len(points)
+        except Exception as e:
+            logger.error(
+                f"Failed to batch upsert {len(memories)} memories: {e}")
+            raise
+
     async def hybrid_search(
         self,
         dense_vector: List[float],

@@ -53,8 +53,8 @@ async def ingest_text(request: IngestRequest):
         chunk_texts = [chunk.content for chunk in doc.chunks]
         embeddings = await embedding_service.embed_batch(chunk_texts)
         
-        # Store each chunk as a memory
-        memories_created = 0
+        # Prepare batch of memories
+        memories_batch = []
         for chunk, embedding in zip(doc.chunks, embeddings):
             memory_id = uuid4()
             
@@ -80,14 +80,15 @@ async def ingest_text(request: IngestRequest):
             # Generate sparse vector
             sparse_vector = embedding_service.generate_sparse_vector(chunk.content)
             
-            # Upsert to Qdrant
-            await qdrant_service.upsert_memory(
-                memory_id=memory_id,
-                dense_vector=embedding,
-                sparse_vector=sparse_vector,
-                payload=payload,
-            )
-            memories_created += 1
+            memories_batch.append({
+                "memory_id": memory_id,
+                "dense_vector": embedding,
+                "sparse_vector": sparse_vector,
+                "payload": payload,
+            })
+
+        # Batch upsert all memories at once
+        memories_created = await qdrant_service.upsert_memories_batch(memories_batch)
         
         return IngestResponse(
             success=True,
@@ -163,8 +164,8 @@ async def ingest_file(
         chunk_texts = [chunk.content for chunk in doc.chunks]
         embeddings = await embedding_service.embed_batch(chunk_texts)
         
-        # Store memories
-        memories_created = 0
+        # Prepare batch of memories
+        memories_batch = []
         for chunk, embedding in zip(doc.chunks, embeddings):
             memory_id = uuid4()
             
@@ -189,13 +190,15 @@ async def ingest_file(
             
             sparse_vector = embedding_service.generate_sparse_vector(chunk.content)
             
-            await qdrant_service.upsert_memory(
-                memory_id=memory_id,
-                dense_vector=embedding,
-                sparse_vector=sparse_vector,
-                payload=payload,
-            )
-            memories_created += 1
+            memories_batch.append({
+                "memory_id": memory_id,
+                "dense_vector": embedding,
+                "sparse_vector": sparse_vector,
+                "payload": payload,
+            })
+
+        # Batch upsert all memories at once
+        memories_created = await qdrant_service.upsert_memories_batch(memories_batch)
         
         return IngestResponse(
             success=True,
