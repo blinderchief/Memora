@@ -50,6 +50,9 @@ class Settings(BaseSettings):
     clerk_secret_key: Optional[str] = None
     clerk_webhook_secret: Optional[str] = None
 
+    # Database (Neon PostgreSQL)
+    database_url: Optional[str] = None
+
     @property
     def max_file_size_bytes(self) -> int:
         return self.max_file_size_mb * 1024 * 1024

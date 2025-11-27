@@ -2,7 +2,6 @@
 
 > The memory layer of professional work — enabling teams to remember *together*, reason *over time*, and retrieve *contextually*.
 
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.11+-blue.svg)](https://python.org)
 [![Next.js](https://img.shields.io/badge/Next.js-14-black.svg)](https://nextjs.org)
 
@@ -85,17 +84,28 @@ cp .env.example .env
    - Events: `user.created`, `user.updated`, `user.deleted`
    - Get the `CLERK_WEBHOOK_SECRET`
 
-### 3. Backend Setup
+### 3. Neon Database Setup (for Chat History & Activities)
+
+1. Create a free account at [neon.tech](https://neon.tech)
+2. Create a new project
+3. Copy the connection string from the dashboard
+4. Add it to your backend `.env`:
+   ```
+   DATABASE_URL=postgresql://user:password@ep-xxx.region.aws.neon.tech/dbname?sslmode=require
+   ```
+5. Tables are auto-created on first startup
+
+### 4. Backend Setup
 
 ```bash
 cd backend
 uv sync
 cp .env.example .env
-# Add your GEMINI_API_KEY, QDRANT_URL, and CLERK_SECRET_KEY to .env
+# Add your GEMINI_API_KEY, QDRANT_URL, DATABASE_URL, and CLERK_SECRET_KEY to .env
 uv run uvicorn app.main:app --reload
 ```
 
-### 4. Frontend Setup
+### 5. Frontend Setup
 
 ```bash
 cd frontend
@@ -126,7 +136,18 @@ QDRANT_URL=http://localhost:6333
 QDRANT_API_KEY=optional_for_cloud
 CLERK_SECRET_KEY=sk_test_...
 CLERK_WEBHOOK_SECRET=whsec_...
+
+# Neon PostgreSQL (for chat history & activities)
+DATABASE_URL=postgresql://user:password@host/database?sslmode=require
 ```
+
+### Neon Setup (Optional but Recommended)
+1. Create a free account at [neon.tech](https://neon.tech)
+2. Create a new project
+3. Copy the connection string from the dashboard
+4. Add to your `.env` as `DATABASE_URL`
+
+Chat history and activity tracking will be disabled if `DATABASE_URL` is not set.
 
 ### Frontend (.env.local)
 ```

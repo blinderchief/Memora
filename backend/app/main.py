@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.routes import api_router
 from app.config import settings
 from app.db.qdrant import qdrant_service
+from app.db.database import init_db, close_db
 
 # Configure logging
 logging.basicConfig(
@@ -29,9 +30,20 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     await qdrant_service.initialize()
     logger.info("Qdrant collection initialized")
     
+    # Initialize PostgreSQL database (Neon)
+    if settings.database_url:
+        db_initialized = await init_db()
+        if db_initialized:
+            logger.info("PostgreSQL database initialized (Neon)")
+        else:
+            logger.warning("PostgreSQL database initialization failed")
+    else:
+        logger.info("PostgreSQL not configured - chat history disabled")
+
     yield
     
     # Shutdown
+    await close_db()
     logger.info("Shutting down application")
 
 
