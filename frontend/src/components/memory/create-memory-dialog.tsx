@@ -79,7 +79,7 @@ export function CreateMemoryDialog({ open, onOpenChange }: CreateMemoryDialogPro
     });
 
     // Log memory creation to database
-    logMemoryAction("create", result?.id || "new-memory", title.trim() || type);
+    logMemoryAction("create", result?.data?.id || "new-memory", title.trim() || type);
 
     // Reset form
     setTitle("");
