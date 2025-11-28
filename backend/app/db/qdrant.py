@@ -430,6 +430,102 @@ class QdrantService:
 
         return qmodels.Filter(must=conditions)
 
+    async def upsert_network_spark(
+        self,
+        spark_id: UUID,
+        content: str,
+        dense_vector: List[float],
+        sparse_vector: Optional[Dict[str, Any]],
+        metadata: Dict[str, Any],
+    ) -> bool:
+        """
+        Upsert a network spark to Qdrant with privacy-first metadata.
+        
+        Args:
+            spark_id: Unique spark ID
+            content: Distilled content (no PII)
+            dense_vector: Semantic embedding
+            sparse_vector: Keyword vector
+            metadata: Privacy-safe metadata
+            
+        Returns:
+            Success status
+        """
+        try:
+            vector_dict = {"dense": dense_vector}
+            if sparse_vector:
+                vector_dict["sparse"] = qmodels.SparseVector(
+                    indices=sparse_vector["indices"],
+                    values=sparse_vector["values"],
+                )
+
+            point = qmodels.PointStruct(
+                id=str(spark_id),
+                vector=vector_dict,
+                payload={
+                    "content": content,
+                    "memory_type": "network_spark",
+                    "modality": "text",
+                    **metadata,
+                    "created_at": datetime.utcnow().isoformat(),
+                },
+            )
+
+            self.client.upsert(
+                collection_name=self._collection_name,
+                points=[point],
+            )
+
+            logger.info(f"Network spark {spark_id} upserted successfully")
+            return True
+
+        except Exception as e:
+            logger.error(f"Failed to upsert network spark {spark_id}: {e}")
+            return False
+
+    async def search_network_sparks(
+        self,
+        user_id: str,
+        dense_vector: List[float],
+        limit: int = 20,
+        relevance_threshold: float = 0.5,
+    ) -> List[Dict[str, Any]]:
+        """
+        Search for network sparks relevant to user's interests.
+        
+        Args:
+            user_id: User identifier
+            dense_vector: Query embedding
+            limit: Max results
+            relevance_threshold: Minimum relevance score
+            
+        Returns:
+            List of matching sparks
+        """
+        try:
+            # Filter for network sparks
+            filters = qmodels.Filter(
+                must=[
+                    qmodels.FieldCondition(
+                        key="memory_type",
+                        match=qmodels.MatchValue(value="network_spark"),
+                    ),
+                ]
+            )
+
+            results = await self.hybrid_search(
+                dense_vector=dense_vector,
+                limit=limit,
+                filters=filters,
+                score_threshold=relevance_threshold,
+            )
+
+            return results
+
+        except Exception as e:
+            logger.error(f"Network spark search failed: {e}")
+            return []
+
 
 # Global service instance
 qdrant_service = QdrantService()

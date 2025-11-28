@@ -17,6 +17,7 @@ class MemoryType(str, Enum):
     IMAGE = "image"
     AUDIO = "audio"
     WEB = "web"
+    NETWORK_SPARK = "network_spark"  # Social prompting signals
 
 
 class MemoryModality(str, Enum):

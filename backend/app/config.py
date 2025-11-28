@@ -53,6 +53,15 @@ class Settings(BaseSettings):
     # Database (Neon PostgreSQL)
     database_url: Optional[str] = None
 
+    # Lamatic.ai Configuration
+    lamatic_api_key: str = "demo"  # Set to "demo" for local processing
+
+    # Social Platform APIs (for network prompting)
+    twitter_bearer_token: str = "demo"  # Twitter API v2 bearer token
+    linkedin_access_token: str = "demo"  # LinkedIn API access token
+    mastodon_instance_url: Optional[str] = None
+    github_token: Optional[str] = None
+
     @property
     def max_file_size_bytes(self) -> int:
         return self.max_file_size_mb * 1024 * 1024

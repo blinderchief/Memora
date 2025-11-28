@@ -73,6 +73,7 @@ const navigation = [
     items: [
       { name: "AI Chat", href: "/chat", icon: MessageSquare },
       { name: "Insights", href: "/insights", icon: Lightbulb },
+      { name: "Network Sparks", href: "/network-sparks", icon: Sparkles, badge: "New" },
       { name: "Memory Health", href: "/health", icon: Heart },
       { name: "Focus Mode", href: "/focus", icon: Target },
       { name: "Knowledge Graph", href: "/graph", icon: Network },
@@ -245,6 +246,7 @@ export default function DashboardLayout({
                       {group.items.map((item) => {
                         const isActive = pathname === item.href || pathname?.startsWith(item.href + "/");
                         const Icon = item.icon;
+                        const itemBadge = (item as any).badge;
 
                         const linkContent = (
                           <Link
@@ -259,7 +261,16 @@ export default function DashboardLayout({
                             )}
                           >
                             <Icon className={cn("h-4 w-4 shrink-0", isActive && "text-violet-500")} />
-                            {!collapsed && <span>{item.name}</span>}
+                            {!collapsed && (
+                              <>
+                                <span className="flex-1">{item.name}</span>
+                                {itemBadge && (
+                                  <Badge variant="secondary" className="text-[10px] bg-violet-500/20 text-violet-400 border-violet-500/30">
+                                    {itemBadge}
+                                  </Badge>
+                                )}
+                              </>
+                            )}
                           </Link>
                         );
 

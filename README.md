@@ -81,6 +81,7 @@ Memora is an **AI-powered second brain** designed for professionals and teams. U
 | **🎯 Focus Mode** | Pomodoro-style sessions with spaced repetition |
 | **🕸️ Knowledge Graph** | Visual network of connected concepts |
 | **📈 Evolution** | Track how your knowledge grows over time |
+| **✨ Network Sparks** | Social prompting engine - discover insights from your network |
 
 ### 👥 **Team Collaboration**
 - **Project Workspaces**: Organize memories by project
@@ -297,6 +298,9 @@ memora/
 │   │   ├── core/              # Business logic
 │   │   │   ├── ingestion/     # Document parsing
 │   │   │   ├── embedding/     # Vector generation
+│   │   │   ├── retrieval/     # Hybrid search
+│   │   │   ├── intelligence/  # AI insights & agent
+│   │   │   └── social/        # Social prompting engine ✨
 │   │   │   └── retrieval/     # Search algorithms
 │   │   ├── db/                # Database clients
 │   │   │   ├── qdrant.py      # Vector store
@@ -550,6 +554,34 @@ This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) 
 - [shadcn/ui](https://ui.shadcn.com) - UI components
 - [Neon](https://neon.tech) - Serverless Postgres
 - [Google AI](https://ai.google.dev) - Gemini API
+- [Lamatic.ai](https://lamatic.ai) - Flow orchestration for social prompting
+
+---
+
+## ✨ New Feature: Social Prompting Engine
+
+**Network Osmosis** - Automatically discover insights from your social graph!
+
+The Social Prompting Engine pulls anonymized signals from your Twitter, LinkedIn, and other networks to auto-generate PKM entries and prompts. See **[SOCIAL_PROMPTING_SETUP.md](./SOCIAL_PROMPTING_SETUP.md)** for full documentation.
+
+**Key Features:**
+- 🔐 **Privacy-First**: Only stores anonymized vectors, never raw posts
+- 🤖 **Lamatic.ai Orchestration**: Complex multi-step flow automation
+- ✨ **Beautiful UI**: Glowing Network Spark cards with animations
+- 💡 **Auto-Generated Prompts**: PKM questions for reflection
+- 🔍 **Hybrid Matching**: Semantic relevance to your knowledge base
+
+**Quick Start:**
+```bash
+# Use demo mode (no API keys needed)
+cd backend
+echo "LAMATIC_API_KEY=demo" >> .env
+echo "TWITTER_BEARER_TOKEN=demo" >> .env
+
+# Visit /dashboard/network-sparks and click "Inspire Me"!
+```
+
+See **[SOCIAL_PROMPTING_QUICKSTART.md](./SOCIAL_PROMPTING_QUICKSTART.md)** for a 5-minute setup guide.
 
 ---
 

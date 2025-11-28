@@ -78,3 +78,6 @@ temp/
 
 # Qdrant data (local)
 qdrant_data/
+
+#mis
+IMPLEMENTATION_SUMMARY.md

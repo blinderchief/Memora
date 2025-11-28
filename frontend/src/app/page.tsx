@@ -264,7 +264,7 @@ export default function Home() {
           >
             <Badge className="mb-6 bg-violet-500/10 text-violet-600 border-violet-500/20 hover:bg-violet-500/20">
               <Sparkles className="w-3 h-3 mr-1" />
-              Now with GPT-4 Integration
+              Now with Gemini-3 Pro Integration
             </Badge>
             <h1 className="text-5xl md:text-7xl font-bold tracking-tight text-slate-900 dark:text-white mb-6">
               Your Team&apos;s{" "}

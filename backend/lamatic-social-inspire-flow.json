@@ -1,0 +1,337 @@
+{
+  "flow_id": "social-inspire-flow",
+  "version": "1.0.0",
+  "name": "Social Prompting Engine - Network Osmosis",
+  "description": "Orchestrates fetch → filter → embed → relevance-match → generate → upsert pipeline for social prompting",
+  "metadata": {
+    "author": "Memora Team",
+    "created_at": "2025-11-28",
+    "integration": "lamatic.ai",
+    "category": "social_intelligence"
+  },
+  "trigger": {
+    "type": "api",
+    "endpoint": "/flows/trigger",
+    "method": "POST",
+    "authentication": "bearer_token"
+  },
+  "inputs": {
+    "user_id": {
+      "type": "string",
+      "required": true,
+      "description": "User identifier for personalization"
+    },
+    "signals": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "schema": "SocialSignal"
+      },
+      "required": true,
+      "description": "Raw social signals from network"
+    },
+    "config": {
+      "type": "object",
+      "properties": {
+        "max_signals": {
+          "type": "integer",
+          "default": 20
+        },
+        "relevance_threshold": {
+          "type": "number",
+          "default": 0.6
+        },
+        "privacy_level": {
+          "type": "string",
+          "enum": ["full_anonymize", "blur_author", "minimal"],
+          "default": "blur_author"
+        },
+        "include_topics": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "exclude_topics": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "steps": [
+    {
+      "id": "step_1_filter",
+      "name": "Filter Social Signals",
+      "type": "transform",
+      "template": "data-filter",
+      "config": {
+        "operation": "filter",
+        "conditions": [
+          {
+            "field": "posted_at",
+            "operator": "within_hours",
+            "value": "{{ config.time_window_hours }}"
+          },
+          {
+            "field": "content",
+            "operator": "not_contains_any",
+            "value": "{{ config.exclude_topics }}"
+          },
+          {
+            "field": "content",
+            "operator": "min_length",
+            "value": 50
+          }
+        ]
+      },
+      "output": "filtered_signals"
+    },
+    {
+      "id": "step_2_anonymize",
+      "name": "Anonymize Authors",
+      "type": "transform",
+      "template": "privacy-transform",
+      "config": {
+        "privacy_level": "{{ config.privacy_level }}",
+        "hash_fields": ["author_handle"],
+        "remove_fields": ["raw_metadata.sensitive_data"],
+        "blur_pattern": "author_*_*"
+      },
+      "input": "{{ filtered_signals }}",
+      "output": "anonymized_signals"
+    },
+    {
+      "id": "step_3_embed",
+      "name": "Generate Embeddings",
+      "type": "ml",
+      "template": "text-embedding",
+      "config": {
+        "model": "text-embedding-004",
+        "provider": "gemini",
+        "dimensions": 768,
+        "task_type": "retrieval_document",
+        "batch_size": 10,
+        "fields_to_embed": ["content"]
+      },
+      "input": "{{ anonymized_signals }}",
+      "output": "embedded_signals"
+    },
+    {
+      "id": "step_4_relevance_match",
+      "name": "Match Against User Memories",
+      "type": "retrieval",
+      "template": "vector-search",
+      "config": {
+        "vector_db": "qdrant",
+        "collection": "memora_memories",
+        "search_type": "hybrid",
+        "dense_vector": "{{ embedded_signals.embeddings }}",
+        "sparse_vector": "{{ embedded_signals.bm25_vectors }}",
+        "top_k": 5,
+        "filters": {
+          "user_id": "{{ user_id }}",
+          "memory_type": ["note", "document", "conversation"]
+        },
+        "score_threshold": 0.5
+      },
+      "output": "relevant_matches"
+    },
+    {
+      "id": "step_5_calculate_relevance",
+      "name": "Calculate Relevance Scores",
+      "type": "transform",
+      "template": "scoring",
+      "config": {
+        "algorithm": "weighted_sum",
+        "weights": {
+          "semantic_similarity": 0.5,
+          "topic_match": 0.3,
+          "engagement_score": 0.2
+        },
+        "normalization": "min_max",
+        "threshold": "{{ config.relevance_threshold }}"
+      },
+      "input": "{{ relevant_matches }}",
+      "output": "scored_signals"
+    },
+    {
+      "id": "step_6_distill",
+      "name": "Distill Content",
+      "type": "ml",
+      "template": "text-generation",
+      "config": {
+        "model": "gemini-2.0-flash",
+        "provider": "gemini",
+        "temperature": 0.3,
+        "max_tokens": 100,
+        "prompt_template": "Distill this social post into a concise, insight-focused summary (max 300 chars):\n\n{{ signal.content }}\n\nSummary:",
+        "batch_processing": true
+      },
+      "input": "{{ scored_signals }}",
+      "output": "distilled_signals"
+    },
+    {
+      "id": "step_7_extract_topics",
+      "name": "Extract Topic Tags",
+      "type": "ml",
+      "template": "topic-extraction",
+      "config": {
+        "method": "keyword_matching",
+        "keyword_library": [
+          "AI",
+          "machine learning",
+          "productivity",
+          "negotiation",
+          "leadership",
+          "design",
+          "coding",
+          "startup",
+          "research",
+          "innovation"
+        ],
+        "include_custom": "{{ config.include_topics }}",
+        "max_topics_per_signal": 5
+      },
+      "input": "{{ distilled_signals }}",
+      "output": "tagged_signals"
+    },
+    {
+      "id": "step_8_generate_prompts",
+      "name": "Generate PKM Prompts",
+      "type": "ml",
+      "template": "text-generation",
+      "config": {
+        "model": "gemini-2.0-flash",
+        "provider": "gemini",
+        "temperature": 0.7,
+        "max_tokens": 100,
+        "prompt_template": "Based on this network insight about {{ signal.topics }}:\n\n\"{{ signal.content }}\"\n\nGenerate a thought-provoking PKM prompt that encourages personal reflection and knowledge building (1 sentence):",
+        "fallback": "How might this insight apply to your current work?"
+      },
+      "input": "{{ tagged_signals }}",
+      "output": "prompted_signals"
+    },
+    {
+      "id": "step_9_create_sparks",
+      "name": "Create Network Sparks",
+      "type": "transform",
+      "template": "object-mapper",
+      "config": {
+        "mapping": {
+          "id": "uuid()",
+          "content": "{{ distilled_content }}",
+          "original_excerpt": "{{ content[0:280] }}",
+          "source": {
+            "anonymized_id": "{{ anonymized_author.id }}",
+            "display_label": "{{ anonymized_author.label }}",
+            "platform": "{{ platform }}",
+            "trust_score": 0.7
+          },
+          "platform": "{{ platform }}",
+          "relevance_score": "{{ relevance_score }}",
+          "topic_tags": "{{ topics }}",
+          "generated_prompt": "{{ pkm_prompt }}",
+          "privacy_level": "{{ config.privacy_level }}",
+          "created_at": "now()",
+          "embedding_metadata": {
+            "posted_at": "{{ posted_at }}",
+            "engagement_score": "{{ engagement_score }}"
+          }
+        }
+      },
+      "input": "{{ prompted_signals }}",
+      "output": "network_sparks"
+    },
+    {
+      "id": "step_10_rank",
+      "name": "Rank and Limit Sparks",
+      "type": "transform",
+      "template": "sort-limit",
+      "config": {
+        "sort_by": "relevance_score",
+        "order": "descending",
+        "limit": "{{ config.max_signals }}"
+      },
+      "input": "{{ network_sparks }}",
+      "output": "final_sparks"
+    }
+  ],
+  "outputs": {
+    "status": {
+      "type": "string",
+      "value": "success"
+    },
+    "sparks": {
+      "type": "array",
+      "value": "{{ final_sparks }}"
+    },
+    "sparks_generated": {
+      "type": "integer",
+      "value": "{{ final_sparks.length }}"
+    },
+    "execution_id": {
+      "type": "string",
+      "value": "{{ execution.id }}"
+    },
+    "processing_time_ms": {
+      "type": "integer",
+      "value": "{{ execution.duration_ms }}"
+    }
+  },
+  "error_handling": {
+    "on_step_failure": "continue",
+    "max_retries": 3,
+    "retry_delay_ms": 1000,
+    "fallback_outputs": {
+      "status": "partial",
+      "errors": "{{ execution.errors }}"
+    }
+  },
+  "monitoring": {
+    "log_level": "info",
+    "metrics": [
+      "execution_time",
+      "signals_processed",
+      "sparks_generated",
+      "relevance_scores"
+    ],
+    "alerts": {
+      "low_quality_threshold": {
+        "condition": "avg(relevance_scores) < 0.4",
+        "action": "notify"
+      }
+    }
+  },
+  "deployment": {
+    "runtime": "serverless",
+    "auto_scale": true,
+    "timeout_seconds": 60,
+    "memory_mb": 512
+  },
+  "instructions": {
+    "setup": [
+      "1. Import this JSON into Lamatic.ai dashboard (Flows → Import → Paste JSON)",
+      "2. Configure API keys in Lamatic Secrets:",
+      "   - GEMINI_API_KEY: Your Google AI API key",
+      "   - QDRANT_URL: Your Qdrant instance URL",
+      "   - QDRANT_API_KEY: Your Qdrant API key (if applicable)",
+      "3. Test the flow with sample data using the Test Runner",
+      "4. Deploy to production (Flows → Deploy)",
+      "5. Copy the webhook URL and update backend/app/config.py"
+    ],
+    "usage": [
+      "Trigger via API:",
+      "POST https://api.lamatic.ai/v1/flows/trigger",
+      "Headers: { 'Authorization': 'Bearer YOUR_LAMATIC_API_KEY' }",
+      "Body: { 'flow_id': 'social-inspire-flow', 'inputs': {...} }"
+    ],
+    "integration": [
+      "Backend integration is in app/core/social/lamatic_service.py",
+      "The LamaticService.trigger_flow() method calls this flow",
+      "Results are automatically upserted to Qdrant with privacy controls"
+    ]
+  }
+}

@@ -10,6 +10,7 @@ from app.api.routes.users import router as users_router
 from app.api.routes.intelligence import router as intelligence_router
 from app.api.routes.chat import router as chat_router
 from app.api.routes.activity import router as activity_router
+from app.api.routes.social import router as social_router
 
 api_router = APIRouter()
 
@@ -25,5 +26,7 @@ api_router.include_router(
 )
 api_router.include_router(chat_router, tags=["Chat History"])
 api_router.include_router(activity_router, tags=["Activity & Focus"])
+api_router.include_router(social_router, prefix="/social",
+                          tags=["Social Prompting", "Network Sparks"])
 
 __all__ = ["api_router"]
