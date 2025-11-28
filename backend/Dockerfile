@@ -11,15 +11,14 @@ RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Install UV
-RUN pip install uv
+# Copy requirements first (for better caching)
+COPY requirements.txt .
 
-# Copy project files
-COPY pyproject.toml .
+# Install dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy application code
 COPY app/ ./app/
-
-# Install dependencies with UV
-RUN uv pip install --system -e .
 
 # Create uploads directory
 RUN mkdir -p /app/uploads
