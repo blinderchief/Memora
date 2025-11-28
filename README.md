@@ -562,7 +562,7 @@ This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) 
 
 **Network Osmosis** - Automatically discover insights from your social graph!
 
-The Social Prompting Engine pulls anonymized signals from your Twitter, LinkedIn, and other networks to auto-generate PKM entries and prompts. See **[SOCIAL_PROMPTING_SETUP.md](./SOCIAL_PROMPTING_SETUP.md)** for full documentation.
+The Social Prompting Engine pulls anonymized signals from your Twitter, LinkedIn, and other networks to auto-generate PKM entries and prompts. See **[SOCIAL_PROMPTING_SETUP.md](./Docs/SOCIAL_PROMPTING_SETUP.md)** for full documentation.
 
 **Key Features:**
 - 🔐 **Privacy-First**: Only stores anonymized vectors, never raw posts
@@ -581,7 +581,7 @@ echo "TWITTER_BEARER_TOKEN=demo" >> .env
 # Visit /dashboard/network-sparks and click "Inspire Me"!
 ```
 
-See **[SOCIAL_PROMPTING_QUICKSTART.md](./SOCIAL_PROMPTING_QUICKSTART.md)** for a 5-minute setup guide.
+See **[SOCIAL_PROMPTING_QUICKSTART.md](./Docs/SOCIAL_PROMPTING_QUICKSTART.md)** for a 5-minute setup guide.
 
 ---
 
