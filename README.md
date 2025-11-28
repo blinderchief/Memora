@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="frontend/public/memora-logo.svg" alt="Memora Logo" width="120" height="120" />
+  <img src="https://img.shields.io/badge/🧠-Memora-8B5CF6?style=for-the-badge&labelColor=1a1a2e&color=8B5CF6" alt="Memora" height="60" />
 </p>
 
 <h1 align="center">Memora</h1>
