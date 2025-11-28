@@ -25,6 +25,7 @@ import {
   Loader2
 } from "lucide-react";
 import { useCreateMemory } from "@/lib/hooks";
+import { logMemoryAction } from "@/lib/activity";
 
 interface CreateMemoryDialogProps {
   open: boolean;
@@ -69,13 +70,16 @@ export function CreateMemoryDialog({ open, onOpenChange }: CreateMemoryDialogPro
   const handleSubmit = async () => {
     if (!content.trim()) return;
 
-    await createMemory.mutateAsync({
+    const result = await createMemory.mutateAsync({
       title: title.trim() || undefined,
       content: content.trim(),
       type,
       tags: tags.length > 0 ? tags : undefined,
       source: source.trim() || undefined,
     });
+
+    // Log memory creation to database
+    logMemoryAction("create", result?.id || "new-memory", title.trim() || type);
 
     // Reset form
     setTitle("");

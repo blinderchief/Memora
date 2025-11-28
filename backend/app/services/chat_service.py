@@ -8,9 +8,10 @@ from datetime import datetime
 from typing import List, Optional
 
 from sqlalchemy import delete, desc, select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.database import ActivityLog, ChatMessage, ChatSession
+from app.db.database import ActivityLog, ChatMessage, ChatSession, DBUser
 
 logger = logging.getLogger(__name__)
 
@@ -21,10 +22,50 @@ class ChatService:
     def __init__(self, db: AsyncSession):
         self.db = db
     
+    async def _ensure_user_exists(self, user_id: str) -> None:
+        """Ensure the user exists in the database, create if not."""
+        try:
+            result = await self.db.execute(
+                select(DBUser).where(DBUser.id == user_id)
+            )
+            user = result.scalar_one_or_none()
+
+            if not user:
+                # Create a placeholder user - will be updated when Clerk webhook fires
+                new_user = DBUser(
+                    id=user_id,
+                    email=f"{user_id}@placeholder.local",  # Placeholder email
+                    first_name="User",
+                    last_name="",
+                )
+                self.db.add(new_user)
+                await self.db.commit()
+                logger.info(f"Created placeholder user: {user_id}")
+        except IntegrityError as e:
+            # User might already exist due to concurrent request or email conflict
+            await self.db.rollback()
+            logger.warning(f"User creation failed (may already exist): {e}")
+            # Verify user exists after rollback
+            result = await self.db.execute(
+                select(DBUser).where(DBUser.id == user_id)
+            )
+            if not result.scalar_one_or_none():
+                raise ValueError(f"Failed to create or find user: {user_id}")
+        except Exception as e:
+            await self.db.rollback()
+            logger.error(f"Error ensuring user exists: {e}")
+            raise
+
     # ============== Sessions ==============
     
     async def create_session(self, user_id: str, title: str = "New Chat") -> ChatSession:
         """Create a new chat session."""
+        logger.info(f"Creating chat session for user: {user_id}")
+
+        # Ensure user exists first to satisfy foreign key constraint
+        await self._ensure_user_exists(user_id)
+        logger.info(f"User ensured: {user_id}")
+
         session = ChatSession(
             id=str(uuid.uuid4()),
             user_id=user_id,
@@ -33,7 +74,8 @@ class ChatService:
         self.db.add(session)
         await self.db.commit()
         await self.db.refresh(session)
-        
+        logger.info(f"Created chat session: {session.id}")
+
         # Log activity
         await self._log_activity(user_id, "chat_session_created", {"session_id": session.id})
         

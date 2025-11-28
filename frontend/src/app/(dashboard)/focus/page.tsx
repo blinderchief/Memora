@@ -22,6 +22,7 @@ import {
   VolumeX,
   Settings2,
 } from "lucide-react";
+import { logFocusSession, logActivity } from "@/lib/activity";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -213,6 +214,9 @@ export default function FocusPage() {
         const startData = await startRes.json();
         setActiveSession(startData.session);
         setTimeRemaining(startData.session.remaining_seconds);
+        
+        // Log focus session start to database
+        logFocusSession("start", selectedType, duration, topic || undefined);
       }
     } catch (error) {
       console.error("Failed to create session:", error);
@@ -236,6 +240,9 @@ export default function FocusPage() {
       };
       setActiveSession(mockSession);
       setTimeRemaining(duration * 60);
+      
+      // Log even for mock session
+      logFocusSession("start", selectedType, duration, topic || undefined);
     } finally {
       setIsLoading(false);
     }
@@ -292,6 +299,9 @@ export default function FocusPage() {
   const completeSession = async () => {
     if (!activeSession) return;
     
+    // Calculate elapsed time for logging
+    const elapsedMinutes = Math.round((activeSession.duration_minutes * 60 - timeRemaining) / 60);
+    
     try {
       const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
       await fetch(
@@ -301,6 +311,14 @@ export default function FocusPage() {
     } catch (error) {
       console.error("Failed to complete session:", error);
     } finally {
+      // Log focus session completion to database
+      logFocusSession(
+        "complete", 
+        activeSession.session_type, 
+        elapsedMinutes,
+        activeSession.topic || undefined
+      );
+      
       // Always clear the session on end, regardless of API success
       setActiveSession(null);
       setTimeRemaining(0);

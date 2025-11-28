@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import {
@@ -173,6 +173,11 @@ const stats = [
 
 export default function Home() {
   const [isYearly] = useState(true);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   return (
     <div className="min-h-screen bg-white dark:bg-slate-950">
@@ -206,33 +211,43 @@ export default function Home() {
             </div>
 
             <div className="flex items-center gap-4">
-              <SignedOut>
-                <SignInButton mode="modal">
-                  <Button variant="ghost" size="sm">
-                    Sign In
-                  </Button>
-                </SignInButton>
-                <SignUpButton mode="modal">
-                  <Button size="sm" className="bg-violet-600 hover:bg-violet-700">
-                    Get Started Free
-                  </Button>
-                </SignUpButton>
-              </SignedOut>
-              <SignedIn>
-                <Link href="/dashboard">
-                  <Button size="sm" className="bg-violet-600 hover:bg-violet-700">
-                    Go to Dashboard
-                  </Button>
-                </Link>
-                <UserButton
-                  appearance={{
-                    elements: {
-                      avatarBox: "h-9 w-9",
-                    },
-                  }}
-                  afterSignOutUrl="/"
-                />
-              </SignedIn>
+              {mounted ? (
+                <>
+                  <SignedOut>
+                    <SignInButton mode="modal">
+                      <Button variant="ghost" size="sm">
+                        Sign In
+                      </Button>
+                    </SignInButton>
+                    <SignUpButton mode="modal">
+                      <Button size="sm" className="bg-violet-600 hover:bg-violet-700">
+                        Get Started Free
+                      </Button>
+                    </SignUpButton>
+                  </SignedOut>
+                  <SignedIn>
+                    <Link href="/dashboard">
+                      <Button size="sm" className="bg-violet-600 hover:bg-violet-700">
+                        Go to Dashboard
+                      </Button>
+                    </Link>
+                    <UserButton
+                      appearance={{
+                        elements: {
+                          avatarBox: "h-9 w-9",
+                        },
+                      }}
+                      afterSignOutUrl="/"
+                    />
+                  </SignedIn>
+                </>
+              ) : (
+                // Placeholder to prevent layout shift during hydration
+                <div className="flex items-center gap-4">
+                  <div className="h-9 w-16 bg-slate-100 dark:bg-slate-800 rounded animate-pulse" />
+                  <div className="h-9 w-28 bg-violet-600/50 rounded animate-pulse" />
+                </div>
+              )}
             </div>
           </div>
         </div>

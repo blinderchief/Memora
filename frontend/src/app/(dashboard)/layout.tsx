@@ -397,7 +397,7 @@ export default function DashboardLayout({
           </header>
 
           {/* Page Content */}
-          <main className="flex-1">{children}</main>
+          <main className="flex-1 p-6">{children}</main>
         </div>
 
         {/* Upgrade Dialog */}

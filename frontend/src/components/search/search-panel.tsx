@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useSearch } from "@/lib/hooks";
 import { MemoryCard } from "@/components/memory/memory-card";
+import { logActivity } from "@/lib/activity";
 
 const MEMORY_TYPES = [
   "insight",
@@ -61,6 +62,13 @@ export function SearchPanel() {
   const handleSearch = () => {
     if (query.trim()) {
       refetch();
+      // Log search activity to database
+      logActivity("search", {
+        query: query.trim(),
+        mode: searchMode,
+        filters: selectedTypes.length > 0 ? selectedTypes.join(",") : null,
+        temporal_boost: temporalBoost,
+      });
     }
   };
 

@@ -346,7 +346,16 @@ async def export_knowledge_graph():
 async def chat_with_agent(request: ChatMessage):
     """Have a conversation with the memory agent."""
     try:
-        conversation_id = UUID(request.conversation_id) if request.conversation_id else None
+        # Handle conversation ID - can be UUID, temp ID, or None
+        conversation_id = None
+        if request.conversation_id:
+            # Skip temp session IDs, they're for frontend-only sessions
+            if not request.conversation_id.startswith("temp-"):
+                try:
+                    conversation_id = UUID(request.conversation_id)
+                except ValueError:
+                    # Invalid UUID format, treat as new conversation
+                    pass
         
         response = await memory_agent.chat(
             message=request.message,

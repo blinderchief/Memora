@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
   Brain,
@@ -17,17 +18,22 @@ import {
   Calendar,
   Target,
   FolderKanban,
+  MessageSquare,
+  Timer,
+  PlusCircle,
 } from "lucide-react";
 import Link from "next/link";
 import { useUser } from "@clerk/nextjs";
+import { formatDistanceToNow } from "date-fns";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Skeleton } from "@/components/ui/skeleton";
 
-// Mock data - in production, fetch from API
-const stats = [
+// Default mock stats - overridden when real data is available
+const defaultStats = [
   {
     title: "Total Memories",
     value: "1,284",
@@ -35,6 +41,7 @@ const stats = [
     trend: "up",
     icon: Brain,
     color: "violet",
+    key: "memories",
   },
   {
     title: "Documents Processed",
@@ -43,6 +50,7 @@ const stats = [
     trend: "up",
     icon: FileText,
     color: "blue",
+    key: "uploads",
   },
   {
     title: "Searches This Week",
@@ -51,6 +59,7 @@ const stats = [
     trend: "up",
     icon: Search,
     color: "green",
+    key: "searches",
   },
   {
     title: "Team Members",
@@ -134,9 +143,97 @@ const topProjects = [
   { name: "Customer Research", memories: 98, progress: 45 },
 ];
 
+interface Activity {
+  id: string;
+  action: string;
+  details?: {
+    filename?: string;
+    query?: string;
+    mode?: string;
+    result_count?: number;
+    session_type?: string;
+    duration_minutes?: number;
+    [key: string]: unknown;
+  };
+  created_at: string;
+}
+
+// Activity stats is a dynamic object with action names as keys
+interface ActivityStats {
+  [key: string]: number;
+}
+
+const getActivityIcon = (action: string) => {
+  if (action.includes("search")) return Search;
+  if (action.includes("upload")) return Upload;
+  if (action.includes("chat")) return MessageSquare;
+  if (action.includes("focus")) return Timer;
+  if (action.includes("memory")) return Brain;
+  return Sparkles;
+};
+
+const getActivityTitle = (activity: Activity): string => {
+  const { action, details } = activity;
+  if (action === "search" && details?.query) return `Searched: "${details.query}"`;
+  if (action === "upload" && details?.filename) return `Uploaded: ${details.filename}`;
+  if (action === "chat") return "AI Chat Message";
+  if (action === "focus_start") return `Started Focus: ${details?.session_type || "session"}`;
+  if (action === "focus_complete") return `Completed Focus: ${details?.duration_minutes || 0} mins`;
+  if (action === "memory_create") return "Created Memory";
+  if (action === "memory_delete") return "Deleted Memory";
+  return action.replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase());
+};
+
+const getActivityDescription = (activity: Activity): string => {
+  const { action, details } = activity;
+  if (action === "search" && details?.result_count !== undefined) {
+    return `Found ${details.result_count} results (${details.mode || "auto"} mode)`;
+  }
+  if (action === "upload" && details?.chunks_created !== undefined) {
+    return `Created ${details.chunks_created} memory chunks`;
+  }
+  if (action === "focus_start" && details?.topic) {
+    return `Topic: ${details.topic}`;
+  }
+  return "";
+};
+
 export default function DashboardPage() {
   const { user } = useUser();
   const greeting = getGreeting();
+  
+  const [activities, setActivities] = useState<Activity[]>([]);
+  const [activityStats, setActivityStats] = useState<ActivityStats | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchActivityData = async () => {
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      
+      try {
+        const [activitiesRes, statsRes] = await Promise.all([
+          fetch(`${baseUrl}/api/activity/recent?limit=10`),
+          fetch(`${baseUrl}/api/activity/stats?days=7`),
+        ]);
+        
+        if (activitiesRes.ok) {
+          const data = await activitiesRes.json();
+          setActivities(data);
+        }
+        
+        if (statsRes.ok) {
+          const data = await statsRes.json();
+          setActivityStats(data);
+        }
+      } catch (error) {
+        console.error("Failed to fetch activity data:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    fetchActivityData();
+  }, []);
 
   return (
     <div className="p-6 space-y-8">
@@ -178,34 +275,52 @@ export default function DashboardPage() {
         transition={{ delay: 0.2 }}
         className="grid gap-4 md:grid-cols-2 lg:grid-cols-4"
       >
-        {stats.map((stat) => (
-          <Card key={stat.title} className="relative overflow-hidden">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div
-                  className={`p-2 rounded-lg bg-${stat.color}-500/10 border border-${stat.color}-500/20`}
-                >
-                  <stat.icon className={`h-5 w-5 text-${stat.color}-500`} />
+        {(() => {
+          // Compute stats with real data when available
+          const computedStats = defaultStats.map((stat) => {
+            if (!activityStats) return stat;
+            
+            switch (stat.key) {
+              case "searches":
+                // Backend returns "search" not "searches"
+                return { ...stat, value: (activityStats["search"] || 0).toString() };
+              case "uploads":
+                // Backend returns "upload" not "uploads"
+                return { ...stat, value: (activityStats["upload"] || 0).toString() };
+              default:
+                return stat;
+            }
+          });
+          
+          return computedStats.map((stat) => (
+            <Card key={stat.title} className="relative overflow-hidden">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div
+                    className={`p-2 rounded-lg bg-${stat.color}-500/10 border border-${stat.color}-500/20`}
+                  >
+                    <stat.icon className={`h-5 w-5 text-${stat.color}-500`} />
+                  </div>
+                  <Badge
+                    variant="secondary"
+                    className={`gap-1 ${
+                      stat.trend === "up"
+                        ? "text-green-500 bg-green-500/10"
+                        : "text-red-500 bg-red-500/10"
+                    }`}
+                  >
+                    <TrendingUp className="h-3 w-3" />
+                    {stat.change}
+                  </Badge>
                 </div>
-                <Badge
-                  variant="secondary"
-                  className={`gap-1 ${
-                    stat.trend === "up"
-                      ? "text-green-500 bg-green-500/10"
-                      : "text-red-500 bg-red-500/10"
-                  }`}
-                >
-                  <TrendingUp className="h-3 w-3" />
-                  {stat.change}
-                </Badge>
-              </div>
-              <div className="mt-4">
-                <h3 className="text-3xl font-bold">{stat.value}</h3>
-                <p className="text-sm text-muted-foreground mt-1">{stat.title}</p>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+                <div className="mt-4">
+                  <h3 className="text-3xl font-bold">{stat.value}</h3>
+                  <p className="text-sm text-muted-foreground mt-1">{stat.title}</p>
+                </div>
+              </CardContent>
+            </Card>
+          ));
+        })()}
       </motion.div>
 
       {/* Main Content Grid */}
@@ -334,31 +449,72 @@ export default function DashboardPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {recentActivity.map((activity) => (
-                  <div
-                    key={activity.id}
-                    className="flex items-start gap-4 p-3 rounded-lg hover:bg-muted/50 transition-colors"
-                  >
-                    <Avatar className="h-9 w-9">
-                      <AvatarImage src={activity.user.avatar} />
-                      <AvatarFallback>
-                        {activity.user.name
-                          .split(" ")
-                          .map((n) => n[0])
-                          .join("")}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{activity.title}</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        {activity.description}
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {activity.user.name} • {activity.time}
-                      </p>
+                {isLoading ? (
+                  // Loading skeletons
+                  [...Array(4)].map((_, i) => (
+                    <div key={i} className="flex items-start gap-4 p-3">
+                      <Skeleton className="h-9 w-9 rounded-full" />
+                      <div className="flex-1 space-y-2">
+                        <Skeleton className="h-4 w-3/4" />
+                        <Skeleton className="h-3 w-1/2" />
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))
+                ) : activities.length > 0 ? (
+                  activities.slice(0, 5).map((activity) => {
+                    const ActivityIcon = getActivityIcon(activity.action);
+                    return (
+                      <div
+                        key={activity.id}
+                        className="flex items-start gap-4 p-3 rounded-lg hover:bg-muted/50 transition-colors"
+                      >
+                        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-violet-500/10">
+                          <ActivityIcon className="h-4 w-4 text-violet-500" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">
+                            {getActivityTitle(activity)}
+                          </p>
+                          {getActivityDescription(activity) && (
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              {getActivityDescription(activity)}
+                            </p>
+                          )}
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {formatDistanceToNow(new Date(activity.created_at), { addSuffix: true })}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  // Fallback to mock data if no real activities
+                  recentActivity.map((activity) => (
+                    <div
+                      key={activity.id}
+                      className="flex items-start gap-4 p-3 rounded-lg hover:bg-muted/50 transition-colors"
+                    >
+                      <Avatar className="h-9 w-9">
+                        <AvatarImage src={activity.user.avatar} />
+                        <AvatarFallback>
+                          {activity.user.name
+                            .split(" ")
+                            .map((n) => n[0])
+                            .join("")}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{activity.title}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {activity.description}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {activity.user.name} • {activity.time}
+                        </p>
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             </CardContent>
           </Card>

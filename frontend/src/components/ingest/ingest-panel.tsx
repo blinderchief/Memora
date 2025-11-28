@@ -28,6 +28,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useIngestFile } from "@/lib/hooks";
+import { logActivity } from "@/lib/activity";
 
 interface FileUpload {
   file: File;
@@ -117,6 +118,15 @@ export function IngestPanel() {
             : u
         )
       );
+
+      // Log upload activity to database
+      logActivity("upload", {
+        filename: upload.file.name,
+        file_type: upload.file.type,
+        file_size: upload.file.size,
+        chunks_created: result.chunks_created,
+        chunking_strategy: chunkingStrategy,
+      });
     } catch (err) {
       const error = err instanceof Error ? err : new Error("Upload failed");
       setUploads((prev) =>

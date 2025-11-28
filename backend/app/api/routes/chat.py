@@ -2,6 +2,7 @@
 API routes for chat sessions and history.
 """
 
+import logging
 from datetime import datetime
 from typing import List, Optional
 
@@ -13,6 +14,7 @@ from app.db.database import get_db
 from app.services.chat_service import ChatService
 
 router = APIRouter(prefix="/chat", tags=["Chat"])
+logger = logging.getLogger(__name__)
 
 
 # ============== Schemas ==============
@@ -91,9 +93,14 @@ async def create_chat_session(
     if db is None:
         raise HTTPException(status_code=503, detail="Database not configured")
     
-    service = ChatService(db)
-    session = await service.create_session(user_id, request.title or "New Chat")
-    return session
+    try:
+        service = ChatService(db)
+        session = await service.create_session(user_id, request.title or "New Chat")
+        return session
+    except Exception as e:
+        logger.error(f"Failed to create chat session for user {user_id}: {e}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to create session: {str(e)}")
 
 
 @router.get("/sessions/{session_id}", response_model=ChatSessionResponse)

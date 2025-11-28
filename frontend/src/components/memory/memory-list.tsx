@@ -15,6 +15,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useMemories, useDeleteMemory } from "@/lib/hooks";
+import { logMemoryAction } from "@/lib/activity";
 import { MemoryCard } from "./memory-card";
 import { CreateMemoryDialog } from "./create-memory-dialog";
 
@@ -74,6 +75,8 @@ export function MemoryList() {
   const handleDelete = async (id: string) => {
     if (confirm("Are you sure you want to delete this memory?")) {
       await deleteMemory.mutateAsync(id);
+      // Log memory deletion to database
+      logMemoryAction("delete", id);
     }
   };
 
